@@ -1,15 +1,15 @@
 <!DOCTYPE html>
 <html lang="zh">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>简道云甘特图调度系统</title>
   <script src="https://cdn.dhtmlx.com/gantt/edge/dhtmlxgantt.js"></script>
-  <link rel="stylesheet" href="https://cdn.dhtmlx.com/gantt/edge/dhtmlxgantt.css">
+  <link rel="stylesheet" href="https://cdn.dhtmlx.com/gantt/edge/dhtmlxgantt.css" />
   <style>
     html, body {
-      height: 100%;
       margin: 0;
       padding: 0;
+      height: 100%;
     }
     #gantt_container {
       width: 100%;
@@ -21,72 +21,58 @@
   <div id="gantt_container"></div>
 
   <script>
-    // ✅ 替换为你的真实信息
-    const API_KEY = "Bearer S8By7m7d2t0m4LtVY1pTw1bAXTVv2UJh";  // ⚠️ 建议使用权限受限的 Token
-    const APP_ID = "6792e7751ee21d64ef5ff3cc";
-    const ENTRY_ID = "671f6f6f143936b75805231e";
-    const FIELD_TASK_ID = "_widget_1686131638256"; // 任务名
-    const FIELD_START_TIME = "_widget_1686679417152"; // 开始时间
-    const FIELD_END_TIME = "_widget_1686679417154"; // 结束时间
+    // 初始化甘特图
+    gantt.config.scale_unit = "minute";
+    gantt.config.step = 15;
+    gantt.config.date_scale = "%H:%i";
+    gantt.config.date_format = "%Y-%m-%d %H:%i:%s";
+    gantt.init("gantt_container");
 
-    const API_LIST_URL = "https://api.jiandaoyun.com/api/v5/app/entry/data/list";
-    const API_UPDATE_URL = "https://api.jiandaoyun.com/api/v5/app/entry/data/update";
-
-    // ✅ 加载任务数据
+    // 加载任务数据
     async function loadData() {
-      const response = await fetch(API_LIST_URL, {
-        method: "POST",
-        headers: {
-          "Authorization": API_KEY,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          app_id: APP_ID,
-          entry_id: ENTRY_ID,
-          page_size: 1000
-        })
-      });
-
-      const res = await response.json();
-      const tasks = res.data.map(item => ({
-        id: item._id,
-        text: item[FIELD_TASK_ID],
-        start_date: new Date(item[FIELD_START_TIME]?.value || Date.now()),
-        end_date: new Date(item[FIELD_END_TIME]?.value || Date.now() + 3600000),
-        progress: 0
-      }));
-
-      // 初始化甘特图
-      gantt.config.scale_unit = "minute";
-      gantt.config.step = 15;
-      gantt.config.date_scale = "%H:%i";
-      gantt.config.date_format = "%Y-%m-%d %H:%i:%s";
-      gantt.init("gantt_container");
-      gantt.parse({ data: tasks });
-
-      // 拖拽任务后更新简道云数据
-      gantt.attachEvent("onTaskChanged", (id, task) => {
-        fetch(API_UPDATE_URL, {
-          method: "POST",
-          headers: {
-            "Authorization": API_KEY,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            app_id: APP_ID,
-            entry_id: ENTRY_ID,
-            data_id: id,
-            data: {
-              [FIELD_START_TIME]: { value: task.start_date.toISOString() },
-              [FIELD_END_TIME]: { value: task.end_date.toISOString() }
-            }
-          })
-        })
-        .then(res => {
-          if (!res.ok) alert("时间更新失败，请检查网络或API权限！");
-        });
-      });
+      try {
+        const response = await fetch("https://get-tasks-dzgxrqhect.cn-hangzhou.fcapp.run");
+        const result = await response.json();
+        const tasks = result.data.map(item => ({
+          id: item._id,
+          text: item._widget_1686131638256,
+          start_date: new Date(item._widget_1686679417152?.value),
+          end_date: new Date(item._widget_1686679417154?.value)
+        }));
+        gantt.parse({ data: tasks });
+      } catch (err) {
+        console.error("加载数据失败:", err);
+        alert("加载任务失败，请检查网络或API地址");
+      }
     }
+
+    // 拖拽后回写简道云
+    gantt.attachEvent("onTaskChanged", (id, task) => {
+      fetch("https://gantt-proxy-nyctpdtbvx.cn-hangzhou.fcapp.run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          data_id: id,
+          start_time: task.start_date.toISOString(),
+          end_time: task.end_date.toISOString()
+        })
+      })
+      .then(res => res.json())
+      .then(result => {
+        if (result.code !== 0) {
+          alert("更新失败：" + result.msg);
+        }
+      })
+      .catch(err => {
+        console.error("更新失败：", err);
+        alert("时间回传失败！");
+      });
+    });
+
+    loadData();
+  </script>
+</body>
+</html>
 
     loadData();
   </script>
